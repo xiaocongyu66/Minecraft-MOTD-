@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft MOTD 查询工具</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(to bottom, #87CEEB 0%, #4CAF50 100%); /* 天空到草地渐变 */
+            font-family: 'Press Start 2P', cursive; /* Minecraft 像素字体 */
+            color: #FFFFFF;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* 文字阴影 */
+            background-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Crect x="0" y="50" width="100" height="50" fill="%23795548" /%3E%3Crect x="0" y="0" width="100" height="50" fill="%234CAF50" /%3E%3C/svg%3E'); /* 轻微纹理 */
+            background-size: 100px 100px;
+        }
+        .container {
+            background-color: rgba(0, 0, 0, 0.7); /* 半透明黑背景 */
+            border: 4px solid #4CAF50; /* 绿色边框 */
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); /* 绿色辉光 */
+            animation: fadeIn 1s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        h1 {
+            text-align: center;
+            color: #FFD700; /* 金色标题 */
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin: 10px 0 5px;
+            font-size: 0.9em;
+            color: #FFD700;
+        }
+        input, select {
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 2px solid #2196F3; /* 蓝色边框 */
+            border-radius: 8px;
+            background-color: #333;
+            color: #FFF;
+            font-family: Arial, sans-serif; /* 输入框用正常字体 */
+            font-size: 1em;
+        }
+        button {
+            background-color: #4CAF50; /* 绿色按钮 */
+            color: #FFF;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        button:hover {
+            background-color: #66BB6A;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.8);
+        }
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            background-color: rgba(33, 150, 243, 0.2); /* 蓝色半透明 */
+            border-radius: 10px;
+            border: 2px solid #2196F3;
+            min-height: 100px;
+            position: relative;
+        }
+        .loading {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #4CAF50;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        .online { color: #4CAF50; } /* 绿色在线 */
+        .offline { color: #F44336; } /* 红色离线 */
+        .motd { white-space: pre-wrap; color: #FFD700; } /* MOTD 支持多行 */
+        .server-icon { max-width: 64px; border-radius: 5px; margin-bottom: 10px; }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 1.2em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Minecraft 服务器 MOTD 查询</h1>
+        <form id="queryForm">
+            <label for="ip">服务器 IP / 域名：</label>
+            <input type="text" id="ip" placeholder="例如: play.hypixel.net" required>
+            
+            <label for="port">端口（Java: 25565, Bedrock: 19132）：</label>
+            <input type="number" id="port" placeholder="25565" required>
+            
+            <label for="version">版本：</label>
+            <select id="version" required>
+                <option value="java">Java Edition</option>
+                <option value="bedrock">Bedrock Edition</option>
+            </select>
+            
+            <button type="submit">查询服务器</button>
+        </form>
+        
+        <div id="result">
+            <div id="loading" class="loading"></div>
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('queryForm');
+        const resultDiv = document.getElementById('result');
+        const loading = document.getElementById('loading');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const ip = document.getElementById('ip').value.trim();
+            const port = document.getElementById('port').value.trim();
+            const version = document.getElementById('version').value;
+            
+            if (!ip || !port) {
+                resultDiv.innerHTML = '<p class="offline status-icon">❌</p><p style="color: #F44336;">请填写 IP 和端口。</p>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '';
+            loading.style.display = 'block';
+            
+            try {
+                const apiUrl = `https://api.mcsrvstat.us/3/${ip}${port ? ':' + port : ''}`;
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                
+                loading.style.display = 'none';
+                
+                if (!data.online) {
+                    resultDiv.innerHTML = '<p class="offline status-icon">❌</p><p style="color: #F44336;">服务器离线或无法查询。</p>';
+                    return;
+                }
+                
+                if (version === 'bedrock' && !data.bedrock) {
+                    resultDiv.innerHTML = '<p class="offline status-icon">❌</p><p style="color: #F44336;">这似乎不是 Bedrock 服务器。</p>';
+                    return;
+                }
+                
+                // 显示结果
+                let motd = data.motd ? data.motd.clean.join('<br>') || data.motd.raw : '无 MOTD';
+                let icon = data.icon ? `<img src="${data.icon}" alt="Server Icon" class="server-icon">` : '';
+                let html = `
+                    <p class="online status-icon">✅</p>
+                    ${icon}
+                    <p><strong>服务器:</strong> ${data.hostname || ip}:${data.port}</p>
+                    <p><strong>状态:</strong> 在线</p>
+                    <p><strong>MOTD:</strong><br><span class="motd">${motd}</span></p>
+                    <p><strong>版本:</strong> ${data.version}</p>
+                    <p><strong>玩家:</strong> ${data.players.online} / ${data.players.max}</p>
+                    <p><strong>软件:</strong> ${data.software || '未知'}</p>
+                `;
+                
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                loading.style.display = 'none';
+                resultDiv.innerHTML = '<p class="offline status-icon">❌</p><p style="color: #F44336;">查询失败：' + error.message + '</p>';
+            }
+        });
+    </script>
+</body>
+</html>
